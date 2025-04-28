@@ -15,9 +15,17 @@ const AlertsOverview: React.FC = () => {
     showSuccessToast: false, // Don't need success toast for initial data load
   });
 
-  // Fetch alerts on component mount
+  // Fetch alerts on component mount and set up auto-refresh
   useEffect(() => {
     fetchAlerts();
+    
+    // Set up a timer to refresh alerts every 30 seconds
+    const refreshTimer = setInterval(() => {
+      fetchAlerts();
+    }, 30000);
+    
+    // Clean up the timer when component unmounts
+    return () => clearInterval(refreshTimer);
   }, []);
 
   const fetchAlerts = async () => {
@@ -50,7 +58,12 @@ const AlertsOverview: React.FC = () => {
             )}
           </Button>
         </div>
-        <CardDescription>Summary of current security alerts</CardDescription>
+        <CardDescription>
+          Summary of current security alerts
+          <span className="block text-xs mt-1">
+            Last updated: {new Date().toLocaleString()}
+          </span>
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {alertsApi.isError && (

@@ -12,54 +12,59 @@ export class ApiError extends Error {
   }
 }
 
-// Mock alert data
-const mockAlerts: AlertItem[] = [
-  {
-    id: '001',
-    title: 'Armed group spotted near Panyagor',
-    description: 'A group of 5-7 armed individuals sighted moving towards Panyagor from eastern border area. Local police notified and drone surveillance deployed.',
-    location: 'Eastern Panyagor',
-    timestamp: new Date(2025, 3, 28, 10, 45),
-    level: AlertLevel.High,
-    verified: true
-  },
-  {
-    id: '002',
-    title: 'Suspicious movement near Duk border',
-    description: 'Unidentified movement reported by residents near the Duk border crossing. Details unclear, patrol requested.',
-    location: 'Duk Border Area',
-    timestamp: new Date(2025, 3, 28, 9, 22),
-    level: AlertLevel.Medium,
-    verified: false
-  },
-  {
-    id: '003',
-    title: 'Gunshots reported in Poktap region',
-    description: 'Multiple gunshots heard from direction of Murle territory. Unknown if related to hunting or potential raid activity.',
-    location: 'Poktap Region',
-    timestamp: new Date(2025, 3, 27, 16, 15),
-    level: AlertLevel.Medium,
-    verified: true
-  },
-  {
-    id: '004',
-    title: 'All clear following patrol',
-    description: 'Area secured following patrol by local defense forces. Previous suspicious activity determined to be non-threatening.',
-    location: 'Makuach Zone',
-    timestamp: new Date(2025, 3, 27, 13, 30),
-    level: AlertLevel.Low,
-    verified: true
-  },
-  {
-    id: '005',
-    title: 'Fire spotted via satellite',
-    description: 'NASA FIRMS detected heat signatures consistent with fire activity. Could indicate village burning or natural brush fire.',
-    location: 'Southern Border',
-    timestamp: new Date(2025, 3, 26, 11, 50),
-    level: AlertLevel.High,
-    verified: true
-  }
-];
+// Generate dynamic mock data with current timestamps
+const generateCurrentAlerts = (): AlertItem[] => {
+  return [
+    {
+      id: '001',
+      title: 'Armed group spotted near Panyagor',
+      description: 'A group of 5-7 armed individuals sighted moving towards Panyagor from eastern border area. Local police notified and drone surveillance deployed.',
+      location: 'Eastern Panyagor',
+      timestamp: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
+      level: AlertLevel.High,
+      verified: true
+    },
+    {
+      id: '002',
+      title: 'Suspicious movement near Duk border',
+      description: 'Unidentified movement reported by residents near the Duk border crossing. Details unclear, patrol requested.',
+      location: 'Duk Border Area',
+      timestamp: new Date(Date.now() - 1000 * 60 * 45), // 45 minutes ago
+      level: AlertLevel.Medium,
+      verified: false
+    },
+    {
+      id: '003',
+      title: 'Gunshots reported in Poktap region',
+      description: 'Multiple gunshots heard from direction of Murle territory. Unknown if related to hunting or potential raid activity.',
+      location: 'Poktap Region',
+      timestamp: new Date(Date.now() - 1000 * 60 * 90), // 90 minutes ago
+      level: AlertLevel.Medium,
+      verified: true
+    },
+    {
+      id: '004',
+      title: 'All clear following patrol',
+      description: 'Area secured following patrol by local defense forces. Previous suspicious activity determined to be non-threatening.',
+      location: 'Makuach Zone',
+      timestamp: new Date(Date.now() - 1000 * 60 * 180), // 3 hours ago
+      level: AlertLevel.Low,
+      verified: true
+    },
+    {
+      id: '005',
+      title: 'Fire spotted via satellite',
+      description: 'NASA FIRMS detected heat signatures consistent with fire activity. Could indicate village burning or natural brush fire.',
+      location: 'Southern Border',
+      timestamp: new Date(Date.now() - 1000 * 60 * 240), // 4 hours ago
+      level: AlertLevel.High,
+      verified: true
+    }
+  ];
+};
+
+// Mock alert data that refreshes on each call
+let mockAlerts: AlertItem[] = generateCurrentAlerts();
 
 // Mock heat signatures from NASA FIRMS
 export interface HeatSignature {
@@ -71,40 +76,45 @@ export interface HeatSignature {
   isActive: boolean;
 }
 
-const mockHeatSignatures: HeatSignature[] = [
-  {
-    id: 'FIRMS-1',
-    location: 'Eastern Corridor',
-    coordinates: [7.9578, 31.8238],
-    timestamp: new Date(Date.now() - 1000 * 60 * 30),
-    confidence: 'High',
-    isActive: true
-  },
-  {
-    id: 'FIRMS-2',
-    location: 'Duk Border',
-    coordinates: [7.9878, 31.8638],
-    timestamp: new Date(Date.now() - 1000 * 60 * 120),
-    confidence: 'Medium',
-    isActive: true
-  },
-  {
-    id: 'FIRMS-3',
-    location: 'Southern Poktap',
-    coordinates: [7.8378, 31.7038],
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-    confidence: 'Low',
-    isActive: false
-  },
-  {
-    id: 'FIRMS-4',
-    location: 'Murle Border',
-    coordinates: [7.9978, 31.9038],
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 36),
-    confidence: 'High',
-    isActive: false
-  }
-];
+// Generate dynamic heat signatures with current timestamps
+const generateCurrentHeatSignatures = (): HeatSignature[] => {
+  return [
+    {
+      id: 'FIRMS-1',
+      location: 'Eastern Corridor',
+      coordinates: [7.9578, 31.8238],
+      timestamp: new Date(Date.now() - 1000 * 60 * 10), // 10 minutes ago
+      confidence: 'High',
+      isActive: true
+    },
+    {
+      id: 'FIRMS-2',
+      location: 'Duk Border',
+      coordinates: [7.9878, 31.8638],
+      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
+      confidence: 'Medium',
+      isActive: true
+    },
+    {
+      id: 'FIRMS-3',
+      location: 'Southern Poktap',
+      coordinates: [7.8378, 31.7038],
+      timestamp: new Date(Date.now() - 1000 * 60 * 120), // 2 hours ago
+      confidence: 'Low',
+      isActive: false
+    },
+    {
+      id: 'FIRMS-4',
+      location: 'Murle Border',
+      coordinates: [7.9978, 31.9038],
+      timestamp: new Date(Date.now() - 1000 * 60 * 180), // 3 hours ago
+      confidence: 'High',
+      isActive: false
+    }
+  ];
+};
+
+let mockHeatSignatures: HeatSignature[] = generateCurrentHeatSignatures();
 
 // Mock patrol teams
 export interface PatrolTeam {
@@ -116,40 +126,45 @@ export interface PatrolTeam {
   lastContact: Date;
 }
 
-const mockPatrolTeams: PatrolTeam[] = [
-  {
-    id: 'PT-001',
-    name: 'Team Alpha',
-    status: 'Active',
-    location: 'Eastern Panyagor',
-    members: 4,
-    lastContact: new Date(Date.now() - 1000 * 60 * 30)
-  },
-  {
-    id: 'PT-002',
-    name: 'Team Bravo',
-    status: 'Standby',
-    location: 'Command Center',
-    members: 5,
-    lastContact: new Date(Date.now() - 1000 * 60 * 5)
-  },
-  {
-    id: 'PT-003',
-    name: 'Team Charlie',
-    status: 'Active',
-    location: 'Southern Border',
-    members: 6,
-    lastContact: new Date(Date.now() - 1000 * 60 * 15)
-  },
-  {
-    id: 'PT-004',
-    name: 'UNMISS Patrol',
-    status: 'Active',
-    location: 'Duk Border',
-    members: 8,
-    lastContact: new Date(Date.now() - 1000 * 60 * 45)
-  }
-];
+// Generate patrol teams with current timestamps
+const generateCurrentPatrolTeams = (): PatrolTeam[] => {
+  return [
+    {
+      id: 'PT-001',
+      name: 'Team Alpha',
+      status: 'Active',
+      location: 'Eastern Panyagor',
+      members: 4,
+      lastContact: new Date(Date.now() - 1000 * 60 * 5) // 5 minutes ago
+    },
+    {
+      id: 'PT-002',
+      name: 'Team Bravo',
+      status: 'Standby',
+      location: 'Command Center',
+      members: 5,
+      lastContact: new Date(Date.now() - 1000 * 60 * 2) // 2 minutes ago
+    },
+    {
+      id: 'PT-003',
+      name: 'Team Charlie',
+      status: 'Active',
+      location: 'Southern Border',
+      members: 6,
+      lastContact: new Date(Date.now() - 1000 * 60 * 10) // 10 minutes ago
+    },
+    {
+      id: 'PT-004',
+      name: 'UNMISS Patrol',
+      status: 'Active',
+      location: 'Duk Border',
+      members: 8,
+      lastContact: new Date(Date.now() - 1000 * 60 * 15) // 15 minutes ago
+    }
+  ];
+};
+
+let mockPatrolTeams: PatrolTeam[] = generateCurrentPatrolTeams();
 
 // Utility functions
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -177,6 +192,10 @@ export const api = {
     try {
       await delay(800);
       simulateNetworkError();
+      
+      // Refresh the mock data to get current timestamps
+      mockAlerts = generateCurrentAlerts();
+      
       return [...mockAlerts];
     } catch (error) {
       if (error instanceof ApiError) throw error;
@@ -246,6 +265,10 @@ export const api = {
     try {
       await delay(1200);
       simulateNetworkError();
+      
+      // Refresh the mock data to get current timestamps
+      mockHeatSignatures = generateCurrentHeatSignatures();
+      
       return [...mockHeatSignatures];
     } catch (error) {
       if (error instanceof ApiError) throw error;
@@ -258,6 +281,10 @@ export const api = {
     try {
       await delay(700);
       simulateNetworkError();
+      
+      // Refresh the mock data to get current timestamps
+      mockPatrolTeams = generateCurrentPatrolTeams();
+      
       return [...mockPatrolTeams];
     } catch (error) {
       if (error instanceof ApiError) throw error;

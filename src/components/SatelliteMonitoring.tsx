@@ -16,19 +16,33 @@ const SatelliteMonitoring: React.FC = () => {
   // Use our custom API call hook
   const heatSignaturesApi = useApiCall(api.getHeatSignatures, {
     successToastMessage: "Latest NASA FIRMS fire detection data has been received.",
-    showSuccessToast: true,
+    showSuccessToast: false, // Don't show every time on auto-refresh
   });
   
   // Center map on Twic East County (approximate coordinates)
   const mapCenter: [number, number] = [7.9178, 31.7638];
   const mapZoom = 10;
 
-  // Load initial data
+  // Load initial data and set up auto-refresh
   useEffect(() => {
     fetchHeatSignatures();
+    
+    // Set up auto-refresh every 60 seconds
+    const refreshInterval = setInterval(() => {
+      fetchHeatSignatures(false); // Don't show toast on auto-refresh
+    }, 60000);
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(refreshInterval);
   }, []);
   
-  const fetchHeatSignatures = async () => {
+  const fetchHeatSignatures = async (showToast = true) => {
+    // If showing toast, update the API options
+    if (showToast !== heatSignaturesApi.showSuccessToast) {
+      // This is a workaround since we can't directly modify the API options
+      heatSignaturesApi.showSuccessToast = showToast;
+    }
+    
     const data = await heatSignaturesApi.execute({});
     if (data) {
       setLastUpdated(new Date());
@@ -54,16 +68,32 @@ const SatelliteMonitoring: React.FC = () => {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Satellite className="h-5 w-5 text-primary" />
-          <CardTitle>Satellite Monitoring</CardTitle>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Satellite className="h-5 w-5 text-primary" />
+              <CardTitle>Satellite Monitoring</CardTitle>
+            </div>
+            <CardDescription>
+              Fire detection using NASA FIRMS satellite data
+              <span className="block text-xs mt-1">
+                Last updated: {lastUpdated.toLocaleString()}
+              </span>
+            </CardDescription>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => fetchHeatSignatures(true)}
+            disabled={heatSignaturesApi.isLoading}
+          >
+            {heatSignaturesApi.isLoading ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
         </div>
-        <CardDescription>
-          Fire detection using NASA FIRMS satellite data
-          <span className="block text-xs mt-1">
-            Last updated: {lastUpdated.toLocaleString()}
-          </span>
-        </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="map">
@@ -106,7 +136,7 @@ const SatelliteMonitoring: React.FC = () => {
                         <div className="p-1">
                           <h3 className="font-medium text-base">{signature.location}</h3>
                           <p className="text-xs text-muted-foreground">
-                            {signature.timestamp.toLocaleString()}
+                            {new Date(signature.timestamp).toLocaleString()}
                           </p>
                           <div className="flex items-center gap-1 mt-1">
                             <div className="w-2 h-2 rounded-full" style={{ 
@@ -178,7 +208,7 @@ const SatelliteMonitoring: React.FC = () => {
       </CardContent>
       <CardFooter className="flex gap-2">
         <Button 
-          onClick={fetchHeatSignatures} 
+          onClick={() => fetchHeatSignatures(true)} 
           variant="outline" 
           className="w-full"
           disabled={heatSignaturesApi.isLoading}
