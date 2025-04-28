@@ -7,6 +7,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { useToast } from './ui/use-toast';
 import { AlertLevel } from '../types/alert';
+import { api } from '../lib/api';
 
 interface DroneVerificationProps {
   alertId?: string;
@@ -22,33 +23,86 @@ const DroneVerification: React.FC<DroneVerificationProps> = ({
   const [verificationResult, setVerificationResult] = useState<boolean | null>(null);
   const [notes, setNotes] = useState('');
   const [droneTeam, setDroneTeam] = useState('unmiss');
+  const [estimatedArrival, setEstimatedArrival] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleRequestDrone = () => {
-    setStatus('requesting');
-    // Simulate API call to request drone
-    setTimeout(() => {
-      setStatus('deployed');
+  const handleRequestDrone = async () => {
+    if (!alertId) {
       toast({
-        title: "Drone Deployed",
-        description: "Drone team dispatched to verify the alert.",
+        title: "Error",
+        description: "No alert ID provided. Cannot request drone verification.",
+        variant: "destructive"
       });
-    }, 2000);
+      return;
+    }
+
+    setStatus('requesting');
+    setIsLoading(true);
+    
+    try {
+      // Call the API to request drone verification
+      const response = await api.requestDroneVerification(alertId, droneTeam);
+      
+      if (response.success) {
+        setStatus('deployed');
+        setEstimatedArrival(response.estimatedArrival);
+        toast({
+          title: "Drone Deployed",
+          description: `Drone team dispatched to verify the alert. ETA: ${response.estimatedArrival} minutes.`,
+        });
+      } else {
+        setStatus('idle');
+        toast({
+          title: "Deployment Failed",
+          description: "Unable to deploy drone at this time. Please try again later.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      setStatus('idle');
+      toast({
+        title: "Error",
+        description: "An error occurred while requesting drone verification.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleVerificationSubmit = (verified: boolean) => {
-    setVerificationResult(verified);
-    setStatus('complete');
+  const handleVerificationSubmit = async (verified: boolean) => {
+    if (!alertId) return;
     
-    if (onVerificationComplete) {
-      onVerificationComplete(verified, notes);
+    setIsLoading(true);
+    
+    try {
+      // Call the API to submit the verification result
+      const response = await api.submitVerificationResult(alertId, verified, notes);
+      
+      if (response.success) {
+        setVerificationResult(verified);
+        setStatus('complete');
+        
+        if (onVerificationComplete) {
+          onVerificationComplete(verified, notes);
+        }
+        
+        toast({
+          title: verified ? "Alert Verified" : "Alert Dismissed",
+          description: verified 
+            ? "The threat has been confirmed by drone surveillance." 
+            : "The alert has been marked as false alarm.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An error occurred while submitting verification result.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
-    
-    toast({
-      title: verified ? "Alert Verified" : "Alert Dismissed",
-      description: verified 
-        ? "The threat has been confirmed by drone surveillance." 
-        : "The alert has been marked as false alarm.",
-    });
   };
 
   return (
@@ -101,7 +155,7 @@ const DroneVerification: React.FC<DroneVerificationProps> = ({
             <div className="rounded-md bg-muted p-3">
               <p className="text-sm font-medium">Drone deployed and en route</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Estimated time to target: 12 minutes
+                Estimated time to target: {estimatedArrival} minutes
               </p>
             </div>
             
@@ -146,8 +200,22 @@ const DroneVerification: React.FC<DroneVerificationProps> = ({
       
       <CardFooter>
         {status === 'idle' && (
-          <Button onClick={handleRequestDrone} className="w-full">
-            <Plane className="mr-2 h-4 w-4" /> Request Drone Verification
+          <Button 
+            onClick={handleRequestDrone} 
+            disabled={isLoading || !alertId}
+            className="w-full"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Plane className="mr-2 h-4 w-4" /> 
+                Request Drone Verification
+              </>
+            )}
           </Button>
         )}
         
@@ -156,15 +224,27 @@ const DroneVerification: React.FC<DroneVerificationProps> = ({
             <Button 
               onClick={() => handleVerificationSubmit(false)}
               variant="outline"
+              disabled={isLoading}
               className="flex-1"
             >
-              <X className="mr-2 h-4 w-4" /> Not Verified
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <X className="mr-2 h-4 w-4" />
+              )} 
+              Not Verified
             </Button>
             <Button 
               onClick={() => handleVerificationSubmit(true)}
+              disabled={isLoading}
               className="flex-1 bg-alert-high"
             >
-              <Check className="mr-2 h-4 w-4" /> Confirm Threat
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="mr-2 h-4 w-4" />
+              )} 
+              Confirm Threat
             </Button>
           </div>
         )}

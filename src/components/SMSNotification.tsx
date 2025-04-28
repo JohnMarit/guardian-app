@@ -4,11 +4,12 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { MessageSquare, Siren, Send, Check } from 'lucide-react';
+import { MessageSquare, Siren, Send, Check, Loader2 } from 'lucide-react';
 import { useToast } from './ui/use-toast';
 import { Checkbox } from './ui/checkbox';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { AlertLevel } from '../types/alert';
+import { api } from '../lib/api';
 
 interface SMSNotificationProps {
   alertId?: string;
@@ -25,6 +26,7 @@ const SMSNotification: React.FC<SMSNotificationProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState(defaultMessage || '');
   const [alertLevel, setAlertLevel] = useState<AlertLevel>(defaultLevel);
+  const [recipients, setRecipients] = useState<number | null>(null);
   
   // Selected regions to send alerts to
   const [selectedRegions, setSelectedRegions] = useState<{[key: string]: boolean}>({
@@ -42,18 +44,61 @@ const SMSNotification: React.FC<SMSNotificationProps> = ({
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate message
+    if (!message.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a message to send.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Get selected regions as array
+    const regions = Object.entries(selectedRegions)
+      .filter(([_, selected]) => selected)
+      .map(([region]) => region);
+    
+    if (regions.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select at least one region to send the alert to.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     
-    // Simulate SMS sending
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // Call the API to send SMS alerts
+      const result = await api.sendSMSAlert(message, alertLevel, regions);
+      
+      if (result.success) {
+        setRecipients(result.recipients);
+        toast({
+          title: "Alert Notifications Sent",
+          description: `SMS alerts have been broadcast to ${result.recipients} residents in ${regions.length} regions.`,
+        });
+      } else {
+        toast({
+          title: "Failed to Send Alerts",
+          description: "There was an issue sending the notifications. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Alert Notifications Sent",
-        description: `SMS alerts have been broadcast to ${Object.keys(selectedRegions).filter(k => selectedRegions[k]).length} regions.`,
+        title: "Error",
+        description: "An error occurred while sending notifications.",
+        variant: "destructive"
       });
-    }, 2000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getAlertTemplate = () => {
@@ -83,6 +128,15 @@ const SMSNotification: React.FC<SMSNotificationProps> = ({
           {alertId && (
             <div className="rounded-md bg-muted p-3">
               <p className="text-sm">Sending notifications for Alert #{alertId}</p>
+            </div>
+          )}
+          
+          {recipients && (
+            <div className="rounded-md bg-muted/50 border p-3">
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-green-500" />
+                <p className="text-sm font-medium">Last alert sent to {recipients} recipients</p>
+              </div>
             </div>
           )}
           
@@ -187,7 +241,10 @@ const SMSNotification: React.FC<SMSNotificationProps> = ({
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              "Sending..."
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Sending...
+              </>
             ) : (
               <>
                 {alertLevel === AlertLevel.High 

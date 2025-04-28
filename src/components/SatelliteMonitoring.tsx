@@ -1,28 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Satellite, Flame, AlertTriangle, CircleAlert, RefreshCw } from 'lucide-react';
+import { Satellite, Flame, AlertTriangle, CircleAlert, RefreshCw, MapPin } from 'lucide-react';
 import { Badge } from './ui/badge';
-import { useToast } from './ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { api, HeatSignature } from '../lib/api';
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { useApiCall } from '@/hooks/use-api-wrapper';
+import { useApiContext } from '@/context/ApiContext';
 
 const SatelliteMonitoring: React.FC = () => {
-  const { toast } = useToast();
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    
-    // Simulate API call to NASA FIRMS
-    setTimeout(() => {
-      setIsRefreshing(false);
+  // Use our custom API call hook
+  const heatSignaturesApi = useApiCall(api.getHeatSignatures, {
+    successToastMessage: "Latest NASA FIRMS fire detection data has been received.",
+    showSuccessToast: true,
+  });
+  
+  // Center map on Twic East County (approximate coordinates)
+  const mapCenter: [number, number] = [7.9178, 31.7638];
+  const mapZoom = 10;
+
+  // Load initial data
+  useEffect(() => {
+    fetchHeatSignatures();
+  }, []);
+  
+  const fetchHeatSignatures = async () => {
+    const data = await heatSignaturesApi.execute({});
+    if (data) {
       setLastUpdated(new Date());
-      toast({
-        title: "Satellite Data Updated",
-        description: "Latest NASA FIRMS fire detection data has been received.",
-      });
-    }, 2000);
+    }
+  };
+
+  // Get marker color based on confidence level
+  const getMarkerColor = (confidence: string, isActive: boolean) => {
+    if (!isActive) return "#888888";
+    
+    switch (confidence) {
+      case 'High':
+        return "#EF4444"; // red-500
+      case 'Medium':
+        return "#F97316"; // orange-500
+      case 'Low':
+        return "#EAB308"; // yellow-500
+      default:
+        return "#888888";
+    }
   };
 
   return (
@@ -47,13 +73,61 @@ const SatelliteMonitoring: React.FC = () => {
           </TabsList>
           
           <TabsContent value="map" className="space-y-4">
-            <div className="border rounded-md p-4 h-60 flex items-center justify-center bg-muted/30">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-2">Satellite imagery will be displayed here</p>
-                <p className="text-xs text-muted-foreground">
-                  In production, this would show a map with heat signatures
-                </p>
-              </div>
+            <div className="h-60 border rounded-md overflow-hidden">
+              {heatSignaturesApi.isLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <MapContainer 
+                  center={mapCenter} 
+                  zoom={mapZoom} 
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  
+                  {heatSignaturesApi.data?.map((signature) => (
+                    <CircleMarker 
+                      key={signature.id}
+                      center={signature.coordinates}
+                      radius={signature.confidence === 'High' ? 10 : 8}
+                      pathOptions={{ 
+                        fillColor: getMarkerColor(signature.confidence, signature.isActive),
+                        color: getMarkerColor(signature.confidence, signature.isActive),
+                        fillOpacity: 0.7,
+                        weight: 1
+                      }}
+                      className={signature.isActive && signature.confidence === 'High' ? 'animate-pulse' : ''}
+                    >
+                      <Popup>
+                        <div className="p-1">
+                          <h3 className="font-medium text-base">{signature.location}</h3>
+                          <p className="text-xs text-muted-foreground">
+                            {signature.timestamp.toLocaleString()}
+                          </p>
+                          <div className="flex items-center gap-1 mt-1">
+                            <div className="w-2 h-2 rounded-full" style={{ 
+                              backgroundColor: getMarkerColor(signature.confidence, signature.isActive)
+                            }}></div>
+                            <span className="text-xs font-medium">
+                              {signature.confidence} confidence
+                            </span>
+                          </div>
+                          {signature.isActive && (
+                            <p className="text-xs mt-1 text-red-500 flex items-center gap-1">
+                              <CircleAlert className="h-3 w-3" />
+                              Active heat signature
+                            </p>
+                          )}
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  ))}
+                </MapContainer>
+              )}
             </div>
             
             <div className="grid grid-cols-2 gap-2">
@@ -77,45 +151,39 @@ const SatelliteMonitoring: React.FC = () => {
           </TabsContent>
           
           <TabsContent value="list" className="space-y-3">
-            <DetectionItem 
-              id="FIRMS-1"
-              location="Eastern Corridor"
-              confidence="High"
-              timestamp={new Date(Date.now() - 1000 * 60 * 30)}
-              isActive={true}
-            />
-            <DetectionItem 
-              id="FIRMS-2"
-              location="Duk Border"
-              confidence="Medium"
-              timestamp={new Date(Date.now() - 1000 * 60 * 120)}
-              isActive={true}
-            />
-            <DetectionItem 
-              id="FIRMS-3"
-              location="Southern Poktap"
-              confidence="Low"
-              timestamp={new Date(Date.now() - 1000 * 60 * 60 * 24)}
-              isActive={false}
-            />
-            <DetectionItem 
-              id="FIRMS-4"
-              location="Murle Border"
-              confidence="High"
-              timestamp={new Date(Date.now() - 1000 * 60 * 60 * 36)}
-              isActive={false}
-            />
+            {heatSignaturesApi.isLoading ? (
+              <div className="py-10 flex justify-center">
+                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              heatSignaturesApi.data?.map((signature) => (
+                <DetectionItem 
+                  key={signature.id}
+                  id={signature.id}
+                  location={signature.location}
+                  confidence={signature.confidence}
+                  timestamp={signature.timestamp}
+                  isActive={signature.isActive}
+                />
+              ))
+            )}
+            
+            {!heatSignaturesApi.isLoading && (!heatSignaturesApi.data || heatSignaturesApi.data.length === 0) && (
+              <div className="py-8 text-center">
+                <p className="text-muted-foreground">No heat signatures detected</p>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </CardContent>
       <CardFooter className="flex gap-2">
         <Button 
-          onClick={handleRefresh} 
+          onClick={fetchHeatSignatures} 
           variant="outline" 
           className="w-full"
-          disabled={isRefreshing}
+          disabled={heatSignaturesApi.isLoading}
         >
-          {isRefreshing ? (
+          {heatSignaturesApi.isLoading ? (
             <>
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> 
               Updating...
