@@ -66,12 +66,20 @@ export const alertService = {
   getAlerts: async () => {
     try {
       const response = await api.get('/alerts');
-      // Validate that response.data is an array
-      if (!response.data || !Array.isArray(response.data)) {
-        console.error('Invalid alerts response:', response.data);
-        throw new Error('Invalid response format from server');
+      console.log('Raw /alerts response:', response.data);
+      // Try to extract the array from common response shapes
+      let alerts = response.data;
+      if (Array.isArray(alerts)) {
+        return alerts;
       }
-      return response.data;
+      if (alerts && Array.isArray(alerts.alerts)) {
+        return alerts.alerts;
+      }
+      if (alerts && Array.isArray(alerts.data)) {
+        return alerts.data;
+      }
+      // If not an array, throw
+      throw new Error('API did not return an array of alerts');
     } catch (error: any) {
       console.error('Error fetching alerts:', error);
       // If the error has a response, throw it with more details
