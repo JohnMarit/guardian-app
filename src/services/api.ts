@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  (window.location.hostname !== 'localhost'
+    ? 'https://community-guard-2525c539a22c.herokuapp.com/api'
+    : 'http://localhost:3001/api');
 
 const api = axios.create({
   baseURL: API_URL,
@@ -60,8 +64,23 @@ export const alertService = {
   },
 
   getAlerts: async () => {
-    const response = await api.get('/alerts');
-    return response.data;
+    try {
+      const response = await api.get('/alerts');
+      // Validate that response.data is an array
+      if (!response.data || !Array.isArray(response.data)) {
+        console.error('Invalid alerts response:', response.data);
+        throw new Error('Invalid response format from server');
+      }
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching alerts:', error);
+      // If the error has a response, throw it with more details
+      if (error.response) {
+        throw new Error(`Failed to fetch alerts: ${error.response.status} - ${error.response.data?.message || 'Unknown error'}`);
+      }
+      // If it's a network error or other issue
+      throw new Error('Failed to fetch alerts: Network error or server unavailable');
+    }
   },
 
   getAlertById: async (id: string) => {

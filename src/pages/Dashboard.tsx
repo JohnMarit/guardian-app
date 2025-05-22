@@ -132,11 +132,15 @@ export default function Dashboard() {
 
   const fetchAlerts = async () => {
     try {
+      setLoading(true);
+      setError('');
       const data = await alertService.getAlerts();
       setAlerts(data);
-      setLoading(false);
     } catch (err: any) {
-      setError('Failed to fetch alerts');
+      console.error('Error in fetchAlerts:', err);
+      setError(err.message || 'Failed to fetch alerts. Please try again later.');
+      setAlerts([]);
+    } finally {
       setLoading(false);
     }
   };
