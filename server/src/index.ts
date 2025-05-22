@@ -19,6 +19,11 @@ app.use(express.static(path.join(__dirname, '../build')));
 // Routes
 app.use('/api/auth', authRoutes);
 
+// Add /api/alerts route
+app.get('/api/alerts', (req, res) => {
+  res.json([]); // Return an empty array or your real alerts data
+});
+
 // Catch-all handler to serve React's index.html for any unknown route (client-side routing)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../build', 'index.html'));
@@ -32,17 +37,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const PORT = process.env.PORT || 3001;
 
-// Initialize database and start server
-async function startServer() {
-  try {
-    await initializeDatabase();
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
-}
-
-startServer(); 
+// Start server without database (for production or demo)
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT} (no DB connection)`);
+}); 
