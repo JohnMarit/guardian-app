@@ -15,7 +15,6 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  register: (email: string, password: string, name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -66,30 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     navigate('/login');
   };
 
-  const register = async (email: string, password: string, name: string) => {
-    try {
-      const response = await apiClient.post('/auth/register', {
-        email,
-        password,
-        name
-      });
-
-      if (!response.data.token) {
-        throw new Error('Registration failed');
-      }
-
-      const token = response.data.token;
-      localStorage.setItem('token', token);
-      
-      const decoded = jwtDecode<User>(token);
-      setUser(decoded);
-    } catch (error) {
-      throw new Error('Registration failed');
-    }
-  };
-
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, register }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
