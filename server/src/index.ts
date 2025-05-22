@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './config/database';
 import authRoutes from './routes/auth';
+import path from 'path';
 
 dotenv.config();
 
@@ -12,8 +13,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, '../build')));
+
 // Routes
 app.use('/api/auth', authRoutes);
+
+// Catch-all handler to serve React's index.html for any unknown route (client-side routing)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../build', 'index.html'));
+});
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
