@@ -32,7 +32,7 @@ router.post('/register', validateRegistration, async (req: Request, res: Respons
 
     // Check if user already exists
     const existingUsers = await query<any[]>(
-      'SELECT id FROM users WHERE email = ?',
+      'SELECT id FROM users WHERE email = $1',
       [email]
     );
 
@@ -46,13 +46,13 @@ router.post('/register', validateRegistration, async (req: Request, res: Respons
 
     // Create user
     const result = await query<any>(
-      'INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)',
+      'INSERT INTO users (email, password, name, role) VALUES ($1, $2, $3, $4) RETURNING id',
       [email, hashedPassword, name, 'user']
     );
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: result.insertId, email, role: 'user' },
+      { id: result[0].id, email, role: 'user' },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '24h' }
     );
@@ -60,7 +60,7 @@ router.post('/register', validateRegistration, async (req: Request, res: Respons
     res.status(201).json({
       token,
       user: {
-        id: result.insertId,
+        id: result[0].id,
         email,
         name,
         role: 'user'
@@ -83,7 +83,7 @@ router.post('/login', validateLogin, async (req: Request, res: Response, next: N
 
     // Find user
     const users = await query<any[]>(
-      'SELECT * FROM users WHERE email = ?',
+      'SELECT * FROM users WHERE email = $1',
       [email]
     );
 

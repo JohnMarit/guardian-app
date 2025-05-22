@@ -22,7 +22,7 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
 
     // Verify user still exists in database
     const users = await query<any[]>(
-      'SELECT id, email, role FROM users WHERE id = ?',
+      'SELECT id, email, role FROM users WHERE id = $1',
       [decoded.id]
     );
 
