@@ -1,26 +1,33 @@
-import mitt from 'mitt';
-
-type Events = {
-  message: any;
-};
+import { EventEmitter } from 'events';
 
 class WebSocketService {
   private ws: WebSocket | null = null;
-  private eventEmitter = mitt<Events>();
+  private eventEmitter = new EventEmitter();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private reconnectTimeout = 1000; // Start with 1 second
+  private reconnectTimeout: NodeJS.Timeout | null = null;
 
-  constructor(private url: string) {}
+  private getWebSocketUrl() {
+    const baseUrl = import.meta.env.VITE_API_URL || 
+      (window.location.hostname !== 'localhost'
+        ? 'https://community-guard-2525c539a22c.herokuapp.com'
+        : 'http://localhost:3001');
+    
+    // Convert http(s) to ws(s)
+    return baseUrl.replace(/^http/, 'ws') + '/ws';
+  }
 
   connect() {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      return;
+    }
+
     try {
-      this.ws = new WebSocket(this.url);
+      this.ws = new WebSocket(this.getWebSocketUrl());
 
       this.ws.onopen = () => {
         console.log('WebSocket connected');
         this.reconnectAttempts = 0;
-        this.reconnectTimeout = 1000;
       };
 
       this.ws.onmessage = (event) => {
@@ -32,32 +39,44 @@ class WebSocketService {
         }
       };
 
+      this.ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
       this.ws.onclose = () => {
         console.log('WebSocket disconnected');
         this.attemptReconnect();
       };
-
-      this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
     } catch (error) {
-      console.error('Error connecting to WebSocket:', error);
+      console.error('Error creating WebSocket connection:', error);
       this.attemptReconnect();
     }
   }
 
   private attemptReconnect() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      this.reconnectTimeout *= 2; // Exponential backoff
-      console.log(`Attempting to reconnect in ${this.reconnectTimeout}ms...`);
-      setTimeout(() => this.connect(), this.reconnectTimeout);
-    } else {
-      console.error('Max reconnection attempts reached');
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.log('Max reconnection attempts reached');
+      return;
     }
+
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    console.log(`Attempting to reconnect in ${delay}ms...`);
+    
+    this.reconnectTimeout = setTimeout(() => {
+      this.reconnectAttempts++;
+      this.connect();
+    }, delay);
   }
 
   disconnect() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+    
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -66,7 +85,9 @@ class WebSocketService {
 
   subscribe(callback: (data: any) => void) {
     this.eventEmitter.on('message', callback);
-    return () => this.eventEmitter.off('message', callback);
+    return () => {
+      this.eventEmitter.off('message', callback);
+    };
   }
 
   send(data: any) {
@@ -78,6 +99,4 @@ class WebSocketService {
   }
 }
 
-// Create a singleton instance
-const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
-export const websocketService = new WebSocketService(wsUrl); 
+export const websocketService = new WebSocketService(); 

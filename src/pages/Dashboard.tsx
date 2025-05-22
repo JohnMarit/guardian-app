@@ -80,21 +80,23 @@ export default function Dashboard() {
     setPagination(prev => ({ ...prev, currentPage: newPage }));
   };
 
-  const filteredAndSortedAlerts = alerts
+  const filteredAndSortedAlerts = (alerts || [])
     .filter(alert => {
+      if (!alert) return false;
       if (filters.status !== 'all' && alert.status !== filters.status) return false;
       if (filters.level !== 'all' && alert.level !== filters.level) return false;
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         return (
-          alert.title.toLowerCase().includes(searchLower) ||
-          alert.description.toLowerCase().includes(searchLower) ||
-          alert.location.toLowerCase().includes(searchLower)
+          alert.title?.toLowerCase().includes(searchLower) ||
+          alert.description?.toLowerCase().includes(searchLower) ||
+          alert.location?.toLowerCase().includes(searchLower)
         );
       }
       return true;
     })
     .sort((a, b) => {
+      if (!a || !b) return 0;
       const multiplier = sort.order === 'asc' ? 1 : -1;
       switch (sort.field) {
         case 'created_at':
