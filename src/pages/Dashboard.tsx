@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { alertService } from '../services/api';
 import { websocketService } from '../services/websocket';
@@ -7,6 +7,7 @@ import { ShieldAlert, Bell, MapPin, AlertTriangle, CheckCircle, XCircle, Filter,
 import debounce from 'lodash/debounce';
 import AlertMap from '../components/AlertMap';
 import AlertAnalytics from '../components/AlertAnalytics';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 interface Alert {
   id: string;
@@ -29,7 +30,7 @@ interface PaginationState {
 
 type ViewType = 'list' | 'map' | 'analytics';
 
-export default function Dashboard() {
+function DashboardContent() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -80,36 +81,84 @@ export default function Dashboard() {
     setPagination(prev => ({ ...prev, currentPage: newPage }));
   };
 
-  const filteredAndSortedAlerts = (alerts || [])
-    .filter(alert => {
-      if (!alert) return false;
-      if (filters.status !== 'all' && alert.status !== filters.status) return false;
-      if (filters.level !== 'all' && alert.level !== filters.level) return false;
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        return (
-          alert.title?.toLowerCase().includes(searchLower) ||
-          alert.description?.toLowerCase().includes(searchLower) ||
-          alert.location?.toLowerCase().includes(searchLower)
-        );
+  const fetchAlerts = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      console.log('Fetching alerts...');
+      const data = await alertService.getAlerts();
+      console.log('Received alerts data:', data);
+      
+      // Ensure data is an array and each item has required properties
+      if (!Array.isArray(data)) {
+        console.error('Invalid alerts data received:', data);
+        throw new Error('Invalid data format received from server');
       }
-      return true;
-    })
-    .sort((a, b) => {
-      if (!a || !b) return 0;
-      const multiplier = sort.order === 'asc' ? 1 : -1;
-      switch (sort.field) {
-        case 'created_at':
-          return multiplier * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        case 'level':
-          const levelOrder = { high: 3, medium: 2, low: 1 };
-          return multiplier * (levelOrder[a.level] - levelOrder[b.level]);
-        case 'status':
-          return multiplier * a.status.localeCompare(b.status);
-        default:
-          return 0;
+
+      // Validate each alert object
+      const validAlerts = data.filter(alert => {
+        if (!alert || typeof alert !== 'object') return false;
+        const requiredFields = ['id', 'title', 'description', 'location', 'level', 'status', 'created_at'];
+        return requiredFields.every(field => alert[field] !== undefined && alert[field] !== null);
+      });
+
+      console.log('Valid alerts:', validAlerts);
+      setAlerts(validAlerts);
+    } catch (err: any) {
+      console.error('Error in fetchAlerts:', err);
+      setError(err.message || 'Failed to fetch alerts. Please try again later.');
+      setAlerts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Memoize the filtered and sorted alerts to prevent unnecessary recalculations
+  const filteredAndSortedAlerts = useMemo(() => {
+    try {
+      if (!Array.isArray(alerts)) {
+        console.error('Alerts is not an array:', alerts);
+        return [];
       }
-    });
+
+      return alerts
+        .filter(alert => {
+          if (!alert || typeof alert !== 'object') return false;
+          
+          if (filters.status !== 'all' && alert.status !== filters.status) return false;
+          if (filters.level !== 'all' && alert.level !== filters.level) return false;
+          
+          if (filters.search) {
+            const searchLower = filters.search.toLowerCase();
+            return (
+              String(alert.title || '').toLowerCase().includes(searchLower) ||
+              String(alert.description || '').toLowerCase().includes(searchLower) ||
+              String(alert.location || '').toLowerCase().includes(searchLower)
+            );
+          }
+          return true;
+        })
+        .sort((a, b) => {
+          if (!a || !b) return 0;
+          
+          const multiplier = sort.order === 'asc' ? 1 : -1;
+          switch (sort.field) {
+            case 'created_at':
+              return multiplier * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            case 'level':
+              const levelOrder = { high: 3, medium: 2, low: 1 };
+              return multiplier * ((levelOrder[a.level] || 0) - (levelOrder[b.level] || 0));
+            case 'status':
+              return multiplier * String(a.status).localeCompare(String(b.status));
+            default:
+              return 0;
+          }
+        });
+    } catch (error) {
+      console.error('Error in filteredAndSortedAlerts:', error);
+      return [];
+    }
+  }, [alerts, filters, sort]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredAndSortedAlerts.length / pagination.itemsPerPage);
@@ -131,21 +180,6 @@ export default function Dashboard() {
       websocketService.disconnect();
     };
   }, []);
-
-  const fetchAlerts = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const data = await alertService.getAlerts();
-      setAlerts(data);
-    } catch (err: any) {
-      console.error('Error in fetchAlerts:', err);
-      setError(err.message || 'Failed to fetch alerts. Please try again later.');
-      setAlerts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getAlertLevelColor = (level: string) => {
     switch (level) {
@@ -560,5 +594,13 @@ export default function Dashboard() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <ErrorBoundary>
+      <DashboardContent />
+    </ErrorBoundary>
   );
 } 

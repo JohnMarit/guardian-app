@@ -13,6 +13,9 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  validateStatus: (status) => {
+    return status >= 200 && status < 300; // Only accept 2xx status codes
+  },
 });
 
 // Add request interceptor to add auth token
@@ -25,6 +28,7 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('Request error:', error);
     return Promise.reject(error);
   }
 );
@@ -32,7 +36,7 @@ apiClient.interceptors.request.use(
 // Add response interceptor to handle errors
 apiClient.interceptors.response.use(
   (response) => {
-    // Log the response data for debugging
+    // Log successful responses
     console.log('API Response:', {
       url: response.config.url,
       status: response.status,
@@ -41,19 +45,26 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Log the error details
+    // Log error details
     console.error('API Error:', {
       url: error.config?.url,
       status: error.response?.status,
       data: error.response?.data,
       message: error.message
     });
-    
+
+    // Handle specific error cases
     if (error.response?.status === 401) {
-      // Clear token and redirect to login on auth error
       localStorage.removeItem('token');
       window.location.href = '/login';
+    } else if (error.response?.status === 404) {
+      console.error('Resource not found:', error.config?.url);
+    } else if (error.response?.status === 500) {
+      console.error('Server error:', error.response?.data);
+    } else if (!error.response) {
+      console.error('Network error:', error.message);
     }
+
     return Promise.reject(error);
   }
 );

@@ -1,64 +1,52 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { ApiError } from '@/lib/api';
-import ApiErrorAlert from './ApiErrorAlert';
-import { Button } from './ui/button';
-import { RefreshCw } from 'lucide-react';
+import React from 'react';
 
 interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
+  children: React.ReactNode;
 }
 
 interface State {
   hasError: boolean;
-  error: Error | ApiError | null;
+  error: Error | null;
 }
 
 /**
  * ErrorBoundary component that catches JavaScript errors in its child component tree
  * and displays a fallback UI instead of crashing the whole application
  */
-class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
-    error: null
-  };
+class ErrorBoundary extends React.Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
 
-  public static getDerivedStateFromError(error: Error | ApiError): State {
-    // Update state so the next render will show the fallback UI
+  static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Error caught by boundary:', error);
+    console.error('Error info:', errorInfo);
   }
 
-  private handleReset = () => {
-    this.setState({ hasError: false, error: null });
-  }
-
-  public render() {
+  render() {
     if (this.state.hasError) {
-      // If a custom fallback is provided, use it
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-      
-      // Otherwise use the default fallback UI
       return (
-        <div className="p-6 max-w-md mx-auto bg-white rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-4">Something went wrong</h2>
-          
-          {this.state.error && <ApiErrorAlert error={this.state.error} />}
-          
-          <p className="text-muted-foreground mb-4">
-            The application encountered an unexpected error. Please try again or contact support if the problem persists.
-          </p>
-          
-          <Button onClick={this.handleReset} className="w-full">
-            <RefreshCw className="mr-2 h-4 w-4" /> 
-            Try Again
-          </Button>
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+          <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-8">
+            <h2 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h2>
+            <p className="text-gray-600 mb-4">
+              {this.state.error?.message || 'An unexpected error occurred'}
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       );
     }
