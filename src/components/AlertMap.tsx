@@ -81,6 +81,19 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
   const mapRef = useRef<L.Map>(null);
   const [mapMode, setMapMode] = useState<'markers' | 'heatmap'>('markers');
   const [showTerritories, setShowTerritories] = useState(true);
+  const [nasaFires, setNasaFires] = useState<any[]>([]);
+
+  // Fetch NASA FIRMS fire data (last 24h, global)
+  useEffect(() => {
+    fetch('https://firms.modaps.eosdis.nasa.gov/geojson/c6/global/24h.json')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.features) {
+          setNasaFires(data.features);
+        }
+      })
+      .catch(err => console.error('Error fetching NASA FIRMS data:', err));
+  }, []);
 
   const getHeatmapRadius = (level: string) => {
     switch (level) {
@@ -160,12 +173,12 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
           <MapContainer
             center={[0, 0]}
             zoom={2}
-            style={{ height: '100%', width: '100%' }}
+            style={{ height: '500px', width: '100%' }}
             ref={mapRef}
           >
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution='Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
             />
             <MapController alerts={alerts} />
             
@@ -279,6 +292,26 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
                   </Circle>
                 ))
             )}
+            {/* NASA FIRMS fire markers */}
+            {nasaFires.map((fire, idx) => (
+              <Marker
+                key={idx}
+                position={[fire.geometry.coordinates[1], fire.geometry.coordinates[0]]}
+                icon={L.divIcon({
+                  className: 'custom-marker',
+                  html: `<div style="background-color: #ef4444; width: 18px; height: 18px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>`
+                })}
+              >
+                <Popup>
+                  <div className="p-2">
+                    <h3 className="font-bold text-lg">NASA FIRMS Fire</h3>
+                    <p className="text-sm text-gray-600">Brightness: {fire.properties.brightness}</p>
+                    <p className="text-sm text-gray-600">Confidence: {fire.properties.confidence}</p>
+                    <p className="text-sm text-gray-600">Date: {fire.properties.acq_date} {fire.properties.acq_time}</p>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
           </MapContainer>
         </div>
 
