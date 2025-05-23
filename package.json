@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "heroku-postbuild": "cd server && npm install && npm run build"
+    "heroku-postbuild": "npm run build && cd server && npm install && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
