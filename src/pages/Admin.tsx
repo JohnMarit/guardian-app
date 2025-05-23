@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -15,7 +15,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 
 // Add Officer interface
@@ -28,6 +27,17 @@ interface Officer {
   role: string;
 }
 
+const OFFICER_ROLE_ID = 'REPLACE_WITH_OFFICER_ROLE_ID'; // TODO: Replace with real officer role UUID
+
+function generateRandomPassword(length = 12) {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+';
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
 const Admin = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -35,6 +45,20 @@ const Admin = () => {
   const [isSendMessageOpen, setIsSendMessageOpen] = useState(false);
   const [newOfficer, setNewOfficer] = useState({ name: '', email: '', phone: '', zone: '' });
   const [messageData, setMessageData] = useState({ subject: '', content: '', zone: '' });
+  const [orgId, setOrgId] = useState<string | null>(null);
+
+  // Fetch org_id on mount
+  useEffect(() => {
+    async function fetchOrgId() {
+      try {
+        const response = await apiClient.get('/api/v1/users/me');
+        setOrgId(response.data.org_id);
+      } catch (error) {
+        toast({ title: 'Error', description: 'Failed to fetch organization ID', variant: 'destructive' });
+      }
+    }
+    fetchOrgId();
+  }, [toast]);
 
   // Fetch officers from the backend
   const { data: officers, isLoading } = useQuery<Officer[]>({
@@ -55,14 +79,30 @@ const Admin = () => {
   // Mutation to add a new officer
   const addOfficerMutation = useMutation<Officer, Error, Omit<Officer, 'id'>>({
     mutationFn: async (officerData: Omit<Officer, 'id'>) => {
-      const response = await apiClient.post('/api/v1/users', { ...officerData, role: 'officer' });
+      if (!orgId) throw new Error('Organization ID not loaded');
+      const password = generateRandomPassword();
+      const payload = {
+        username: officerData.email, // use email as username
+        email: officerData.email,
+        phone: officerData.phone,
+        password,
+        org_id: orgId,
+        roles: [OFFICER_ROLE_ID],
+        name: officerData.name,
+        zone: officerData.zone,
+      };
+      const response = await apiClient.post('/api/v1/users', payload);
       return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['officers'] });
       setIsAddOfficerOpen(false);
       setNewOfficer({ name: '', email: '', phone: '', zone: '' });
+      toast({ title: 'Officer Added', description: 'The new officer has been added successfully.' });
     },
+    onError: (error) => {
+      toast({ title: 'Error', description: error.message || 'Failed to add officer', variant: 'destructive' });
+    }
   });
 
   // Mutation to send message to officers
