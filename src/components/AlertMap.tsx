@@ -91,6 +91,7 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
   const [mapMode, setMapMode] = useState<'markers' | 'heatmap'>('markers');
   const [showTerritories, setShowTerritories] = useState(true);
   const [nasaFires, setNasaFires] = useState<any[]>([]);
+  const [mapType, setMapType] = useState<'satellite' | 'standard'>('satellite');
 
   // Fetch NASA FIRMS fire data (last 24h, global)
   useEffect(() => {
@@ -190,6 +191,16 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
             >
               Heatmap
             </button>
+            <button
+              onClick={() => setMapType(mapType === 'satellite' ? 'standard' : 'satellite')}
+              className={`px-3 py-1 rounded-md text-sm font-medium ${
+                mapType === 'satellite'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {mapType === 'satellite' ? 'Satellite' : 'Standard'}
+            </button>
           </div>
         </div>
       </CardHeader>
@@ -201,10 +212,20 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
             style={{ height: '500px', width: '100%' }}
             ref={mapRef}
           >
-            <TileLayer
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              attribution='Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-            />
+            {/* Map tile layer toggle */}
+            <>
+              {mapType === 'satellite' ? (
+                <TileLayer
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                  attribution='Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                />
+              ) : (
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                />
+              )}
+            </>
             <MapController alerts={alerts} />
             
             {/* Draw county boundaries */}
