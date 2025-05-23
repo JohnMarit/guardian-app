@@ -168,15 +168,14 @@ function DashboardContent() {
   useEffect(() => {
     fetchAlerts();
     websocketService.connect();
-
-    const unsubscribe = websocketService.subscribe((data) => {
+    const handler = (data: any) => {
       if (data.type === 'alert_created' || data.type === 'alert_updated' || data.type === 'alert_deleted') {
         fetchAlerts();
       }
-    });
-
+    };
+    websocketService.on('message', handler);
     return () => {
-      unsubscribe();
+      websocketService.off('message', handler);
       websocketService.disconnect();
     };
   }, []);

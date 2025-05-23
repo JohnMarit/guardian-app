@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import { initializeDatabase } from './config/database';
 import authRoutes from './routes/auth';
 import path from 'path';
+import http from 'http';
+import { WebSocketServer } from 'ws';
 
 dotenv.config();
 
@@ -37,7 +39,17 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const PORT = process.env.PORT || 3001;
 
-// Start server without database (for production or demo)
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} (no DB connection)`);
+// Create HTTP server and WebSocket server
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: '/ws' });
+
+wss.on('connection', (ws) => {
+  console.log('WebSocket client connected');
+  ws.send(JSON.stringify({ type: 'welcome', message: 'WebSocket connected!' }));
+  // Example: broadcast to all clients
+  // wss.clients.forEach(client => client.send(...));
+});
+
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT} (with WebSocket support)`);
 }); 
