@@ -43,7 +43,7 @@ const PORT = process.env.PORT || 3001;
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws: import('ws').WebSocket) => {
   console.log('WebSocket client connected');
   ws.send(JSON.stringify({ type: 'welcome', message: 'WebSocket connected!' }));
   // Example: broadcast to all clients
