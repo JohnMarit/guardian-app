@@ -211,7 +211,7 @@ const Admin = () => {
                       <DialogTrigger asChild>
                         <Button size="sm" variant="outline" className="flex-1">Add Officer</Button>
                       </DialogTrigger>
-                      <DialogContent>
+                      <DialogContent aria-describedby="add-officer-description">
                         <DialogHeader>
                           <DialogTitle>Add New Officer</DialogTitle>
                         </DialogHeader>
@@ -253,7 +253,10 @@ const Admin = () => {
                               required
                             />
                           </div>
-                          <Button type="submit" className="w-full">Add Officer</Button>
+                          {orgId === null && (
+                            <div className="text-red-600 text-sm">Organization ID not loaded. Please wait or refresh the page.</div>
+                          )}
+                          <Button type="submit" className="w-full" disabled={orgId === null}>Add Officer</Button>
                         </form>
                       </DialogContent>
                     </Dialog>
