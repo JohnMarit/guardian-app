@@ -9,8 +9,101 @@ import { ShieldAlert, Bell, Satellite, Plane, Users, Database, FileText, Message
 import LawEnforcementDashboard from '@/components/LawEnforcementDashboard';
 import DroneVerification from '@/components/DroneVerification';
 import SMSNotification from '@/components/SMSNotification';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import apiClient from '@/lib/api-client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useState } from 'react';
+import { useToast } from '@/components/ui/use-toast';
+
+// Add Officer interface
+interface Officer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  zone: string;
+  role: string;
+}
 
 const Admin = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [isAddOfficerOpen, setIsAddOfficerOpen] = useState(false);
+  const [isSendMessageOpen, setIsSendMessageOpen] = useState(false);
+  const [newOfficer, setNewOfficer] = useState({ name: '', email: '', phone: '', zone: '' });
+  const [messageData, setMessageData] = useState({ subject: '', content: '', selectedZone: '' });
+
+  // Fetch officers from the backend
+  const { data: officers, isLoading } = useQuery<Officer[]>({
+    queryKey: ['officers'],
+    queryFn: async () => {
+      const response = await apiClient.get('/api/v1/users', { params: { role: 'officer' } });
+      return response.data;
+    }
+  });
+
+  // Group officers by zone (assuming each officer has a 'zone' field)
+  const officersByZone: Record<string, number> = officers ? officers.reduce((acc, officer) => {
+    const zone = officer.zone || 'Unknown';
+    acc[zone] = (acc[zone] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>) : {};
+
+  // Mutation to add a new officer
+  const addOfficerMutation = useMutation<Officer, Error, Omit<Officer, 'id'>>({
+    mutationFn: async (officerData: Omit<Officer, 'id'>) => {
+      const response = await apiClient.post('/api/v1/users', { ...officerData, role: 'officer' });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['officers'] });
+      setIsAddOfficerOpen(false);
+      setNewOfficer({ name: '', email: '', phone: '', zone: '' });
+    },
+  });
+
+  // Mutation to send message to officers
+  const sendMessageMutation = useMutation({
+    mutationFn: async (data: { subject: string; content: string; zone: string }) => {
+      const response = await apiClient.post('/api/v1/notifications', {
+        type_id: 'message',
+        content: `${data.subject}\n\n${data.content}`,
+        channel: 'sms',
+        roles: ['officer'],
+        filters: { zone: data.zone }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Message Sent",
+        description: "The message has been sent to all officers in the selected zone.",
+      });
+      setIsSendMessageOpen(false);
+      setMessageData({ subject: '', content: '', selectedZone: '' });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleAddOfficer = (e) => {
+    e.preventDefault();
+    addOfficerMutation.mutate(newOfficer as Omit<Officer, 'id'>);
+  };
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    sendMessageMutation.mutate(messageData);
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -56,28 +149,125 @@ const Admin = () => {
                   <CardDescription>Manage community safety personnel</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm">Panyagor Zone</div>
-                      <Badge>3 Active</Badge>
+                  {isLoading ? (
+                    <div className="text-sm">Loading officers...</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {Object.entries(officersByZone).map(([zone, count]) => (
+                        <div key={zone} className="flex justify-between items-center">
+                          <div className="text-sm">{zone}</div>
+                          <Badge>{count} Active</Badge>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm">Poktap Zone</div>
-                      <Badge>2 Active</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm">Duk Border Zone</div>
-                      <Badge variant="outline">1 Active</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm">Makuach Zone</div>
-                      <Badge variant="outline">2 Active</Badge>
-                    </div>
-                  </div>
+                  )}
                   
                   <div className="mt-4 flex gap-2">
-                    <Button size="sm" variant="outline" className="flex-1">Add Officer</Button>
-                    <Button size="sm" variant="outline" className="flex-1">Send Message</Button>
+                    <Dialog open={isAddOfficerOpen} onOpenChange={setIsAddOfficerOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="flex-1">Add Officer</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add New Officer</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleAddOfficer} className="space-y-4">
+                          <div>
+                            <Label htmlFor="name">Name</Label>
+                            <Input
+                              id="name"
+                              value={newOfficer.name}
+                              onChange={(e) => setNewOfficer({ ...newOfficer, name: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                              id="email"
+                              type="email"
+                              value={newOfficer.email}
+                              onChange={(e) => setNewOfficer({ ...newOfficer, email: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="phone">Phone</Label>
+                            <Input
+                              id="phone"
+                              value={newOfficer.phone}
+                              onChange={(e) => setNewOfficer({ ...newOfficer, phone: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="zone">Zone</Label>
+                            <Input
+                              id="zone"
+                              value={newOfficer.zone}
+                              onChange={(e) => setNewOfficer({ ...newOfficer, zone: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <Button type="submit" className="w-full">Add Officer</Button>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                    <Dialog open={isSendMessageOpen} onOpenChange={setIsSendMessageOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="flex-1">Send Message</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Send Message to Officers</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleSendMessage} className="space-y-4">
+                          <div>
+                            <Label htmlFor="zone">Select Zone</Label>
+                            <select
+                              id="zone"
+                              className="w-full rounded-md border border-input bg-background px-3 py-2"
+                              value={messageData.selectedZone}
+                              onChange={(e) => setMessageData({ ...messageData, selectedZone: e.target.value })}
+                              required
+                            >
+                              <option value="">Select a zone</option>
+                              {Object.keys(officersByZone).map((zone) => (
+                                <option key={zone} value={zone}>
+                                  {zone} ({officersByZone[zone]} officers)
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <Label htmlFor="subject">Subject</Label>
+                            <Input
+                              id="subject"
+                              value={messageData.subject}
+                              onChange={(e) => setMessageData({ ...messageData, subject: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="content">Message</Label>
+                            <Textarea
+                              id="content"
+                              value={messageData.content}
+                              onChange={(e) => setMessageData({ ...messageData, content: e.target.value })}
+                              rows={4}
+                              required
+                            />
+                          </div>
+                          <Button 
+                            type="submit" 
+                            className="w-full"
+                            disabled={sendMessageMutation.isPending}
+                          >
+                            {sendMessageMutation.isPending ? "Sending..." : "Send Message"}
+                          </Button>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </CardContent>
               </Card>
@@ -201,15 +391,10 @@ const Admin = () => {
                           <span className="w-2 h-2 rounded-full bg-alert-low"></span>
                         </div>
                         <div className="border rounded-md p-2 flex justify-between items-center">
-                          <span className="text-sm">Eastern Corridor</span>
-                          <span className="w-2 h-2 rounded-full bg-alert-medium"></span>
+                          <span className="text-sm">Makuach</span>
+                          <span className="w-2 h-2 rounded-full bg-alert-low"></span>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline">Configure</Button>
-                      <Button size="sm">View Data</Button>
                     </div>
                   </div>
                 </CardContent>
@@ -219,44 +404,37 @@ const Admin = () => {
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <Plane className="h-5 w-5 text-primary" />
-                    <CardTitle>Drone Surveillance</CardTitle>
+                    <CardTitle>Drone Fleet</CardTitle>
                   </div>
-                  <CardDescription>Manage aerial monitoring systems</CardDescription>
+                  <CardDescription>Manage surveillance drones</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <div className="text-sm font-medium">Available Units</div>
-                      <Badge className="bg-alert-low">3 Drones</Badge>
+                      <div className="text-sm font-medium">Fleet Status</div>
+                      <Badge className="bg-alert-low">Operational</Badge>
                     </div>
                     
-                    <div className="border rounded-md divide-y">
-                      <div className="p-3 flex justify-between items-center">
-                        <div>
-                          <div className="font-medium">Drone Unit 1</div>
-                          <div className="text-xs text-muted-foreground">Team Alpha</div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Available Drones</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="border rounded-md p-2 flex justify-between items-center">
+                          <span className="text-sm">DJI Mavic 3</span>
+                          <span className="w-2 h-2 rounded-full bg-alert-low"></span>
                         </div>
-                        <Badge className="bg-alert-low">Available</Badge>
-                      </div>
-                      <div className="p-3 flex justify-between items-center">
-                        <div>
-                          <div className="font-medium">Drone Unit 2</div>
-                          <div className="text-xs text-muted-foreground">Team Bravo</div>
+                        <div className="border rounded-md p-2 flex justify-between items-center">
+                          <span className="text-sm">DJI Phantom 4</span>
+                          <span className="w-2 h-2 rounded-full bg-alert-low"></span>
                         </div>
-                        <Badge variant="outline" className="text-alert-medium">Deployed</Badge>
-                      </div>
-                      <div className="p-3 flex justify-between items-center">
-                        <div>
-                          <div className="font-medium">UNMISS Drone</div>
-                          <div className="text-xs text-muted-foreground">UN Team</div>
+                        <div className="border rounded-md p-2 flex justify-between items-center">
+                          <span className="text-sm">DJI Mini 3</span>
+                          <span className="w-2 h-2 rounded-full bg-alert-low"></span>
                         </div>
-                        <Badge className="bg-alert-low">Available</Badge>
+                        <div className="border rounded-md p-2 flex justify-between items-center">
+                          <span className="text-sm">DJI Air 2S</span>
+                          <span className="w-2 h-2 rounded-full bg-alert-low"></span>
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline">Maintenance</Button>
-                      <Button size="sm">Deploy Drone</Button>
                     </div>
                   </div>
                 </CardContent>
@@ -316,94 +494,37 @@ const Admin = () => {
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <Bell className="h-5 w-5 text-primary" />
-                  <CardTitle>Alert Management</CardTitle>
+                  <ShieldAlert className="h-5 w-5 text-primary" />
+                  <CardTitle>Alert Settings</CardTitle>
                 </div>
-                <CardDescription>Review and manage incoming alerts</CardDescription>
+                <CardDescription>Configure alert thresholds and notifications</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="border rounded-md p-4 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-medium">New Alert Review</h3>
-                        <p className="text-sm text-muted-foreground">Recent alerts requiring verification</p>
-                      </div>
-                      <Badge>3 Pending</Badge>
-                    </div>
-                    
-                    <div className="border-t pt-3 space-y-2">
-                      <div className="border-l-4 border-alert-high p-3 bg-muted rounded-sm">
-                        <div className="flex justify-between">
-                          <span className="font-medium">Armed individuals near Poktap</span>
-                          <span className="text-xs text-muted-foreground">10 min ago</span>
-                        </div>
-                        <p className="text-sm mt-1">Report of 3-4 armed men moving towards village</p>
-                        <div className="flex justify-end gap-2 mt-2">
-                          <Button size="sm" variant="outline">Dismiss</Button>
-                          <Button size="sm">Verify</Button>
-                        </div>
-                      </div>
-                      
-                      <div className="border-l-4 border-alert-medium p-3 bg-muted rounded-sm">
-                        <div className="flex justify-between">
-                          <span className="font-medium">Suspicious activity - Duk Border</span>
-                          <span className="text-xs text-muted-foreground">35 min ago</span>
-                        </div>
-                        <p className="text-sm mt-1">Unusual movement reported by local herders</p>
-                        <div className="flex justify-end gap-2 mt-2">
-                          <Button size="sm" variant="outline">Dismiss</Button>
-                          <Button size="sm">Verify</Button>
-                        </div>
-                      </div>
-                      
-                      <div className="border-l-4 border-alert-medium p-3 bg-muted rounded-sm">
-                        <div className="flex justify-between">
-                          <span className="font-medium">Potential fire - Eastern Corridor</span>
-                          <span className="text-xs text-muted-foreground">1 hour ago</span>
-                        </div>
-                        <p className="text-sm mt-1">FIRMS detection of heat signature</p>
-                        <div className="flex justify-end gap-2 mt-2">
-                          <Button size="sm" variant="outline">Dismiss</Button>
-                          <Button size="sm">Verify</Button>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm font-medium">Alert Thresholds</div>
+                    <Button size="sm" variant="outline">Edit</Button>
                   </div>
                   
-                  <div className="border rounded-md p-4 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-medium">Alert Settings</h3>
-                        <p className="text-sm text-muted-foreground">Configure alert thresholds and notifications</p>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">Notification Channels</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="border rounded-md p-2 flex justify-between items-center">
+                        <span className="text-sm">SMS</span>
+                        <span className="w-2 h-2 rounded-full bg-alert-low"></span>
                       </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm">Immediate SMS Alert</span>
-                          <Badge variant="outline" className="text-alert-high">High Only</Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Auto-Verification</span>
-                          <Badge variant="outline" className="text-alert-medium">2+ Reports</Badge>
-                        </div>
+                      <div className="border rounded-md p-2 flex justify-between items-center">
+                        <span className="text-sm">Email</span>
+                        <span className="w-2 h-2 rounded-full bg-alert-low"></span>
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm">Drone Dispatch</span>
-                          <Badge variant="outline" className="text-alert-high">High Only</Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Police Notification</span>
-                          <Badge variant="outline" className="text-alert-low">All Levels</Badge>
-                        </div>
+                      <div className="border rounded-md p-2 flex justify-between items-center">
+                        <span className="text-sm">Push</span>
+                        <span className="w-2 h-2 rounded-full bg-alert-low"></span>
                       </div>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button size="sm" variant="outline">Edit Settings</Button>
+                      <div className="border rounded-md p-2 flex justify-between items-center">
+                        <span className="text-sm">Radio</span>
+                        <span className="w-2 h-2 rounded-full bg-alert-low"></span>
+                      </div>
                     </div>
                   </div>
                 </div>
