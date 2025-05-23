@@ -16,29 +16,38 @@ const createCustomIcon = (level: string) => {
   });
 };
 
-// Territory boundaries (example coordinates - replace with actual territory boundaries)
-const TERRITORY_BOUNDARIES = [
+// Approximate boundaries for Twic East, Duk, Bor (South Sudan)
+const COUNTY_BOUNDARIES = [
   {
-    name: 'Territory 1',
+    name: 'Twic East',
     coordinates: [
-      [0, 0] as LatLngTuple,
-      [0, 1] as LatLngTuple,
-      [1, 1] as LatLngTuple,
-      [1, 0] as LatLngTuple,
+      [7.5, 31.2], [7.9, 31.2], [7.9, 31.7], [7.5, 31.7], [7.5, 31.2]
     ],
     color: '#3b82f6',
   },
   {
-    name: 'Territory 2',
+    name: 'Duk',
     coordinates: [
-      [1, 1] as LatLngTuple,
-      [1, 2] as LatLngTuple,
-      [2, 2] as LatLngTuple,
-      [2, 1] as LatLngTuple,
+      [8.0, 31.2], [8.4, 31.2], [8.4, 31.7], [8.0, 31.7], [8.0, 31.2]
     ],
     color: '#8b5cf6',
   },
+  {
+    name: 'Bor',
+    coordinates: [
+      [6.9, 31.3], [7.3, 31.3], [7.3, 31.8], [6.9, 31.8], [6.9, 31.3]
+    ],
+    color: '#22c55e',
+  },
 ];
+
+// Bounding box for all three counties
+const BOUNDS = {
+  minLat: 6.9,
+  maxLat: 8.4,
+  minLng: 31.2,
+  maxLng: 31.8,
+};
 
 interface Alert {
   id: string;
@@ -126,6 +135,22 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
     return polygonBounds.contains(point);
   };
 
+  const mapCenter: [number, number] = [7.7, 31.5];
+  const mapZoom = 9;
+
+  // Filter NASA FIRMS fires to only those within the bounding box
+  const filteredNasaFires = nasaFires.filter(fire => {
+    const [lng, lat] = fire.geometry.coordinates;
+    return lat >= BOUNDS.minLat && lat <= BOUNDS.maxLat && lng >= BOUNDS.minLng && lng <= BOUNDS.maxLng;
+  });
+
+  // Placeholder for mass movement event
+  const massMovementMarker = {
+    lat: 7.8,
+    lng: 31.4,
+    description: 'Mass movement detected (placeholder)',
+  };
+
   return (
     <Card className="w-full h-full">
       <CardHeader className="pb-2">
@@ -171,8 +196,8 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
       <CardContent className="p-0 relative">
         <div className="map-container">
           <MapContainer
-            center={[0, 0]}
-            zoom={2}
+            center={mapCenter}
+            zoom={mapZoom}
             style={{ height: '500px', width: '100%' }}
             ref={mapRef}
           >
@@ -182,30 +207,21 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
             />
             <MapController alerts={alerts} />
             
-            {/* Territory Boundaries */}
-            {showTerritories && TERRITORY_BOUNDARIES.map((territory, index) => (
+            {/* Draw county boundaries */}
+            {COUNTY_BOUNDARIES.map((county, idx) => (
               <Polygon
-                key={index}
-                positions={territory.coordinates}
+                key={county.name}
+                positions={county.coordinates.map(([lat, lng]) => [lat, lng] as LatLngTuple)}
                 pathOptions={{
-                  color: territory.color,
-                  fillColor: territory.color,
-                  fillOpacity: 0.1,
+                  color: county.color,
+                  fillColor: county.color,
+                  fillOpacity: 0.08,
                   weight: 2,
                 }}
               >
                 <Popup>
                   <div className="p-2">
-                    <h3 className="font-bold text-lg">{territory.name}</h3>
-                    <p className="text-sm text-gray-600">
-                      {alerts.filter(alert => 
-                        alert.coordinates && 
-                        isPointInPolygon(
-                          L.latLng(alert.coordinates.lat, alert.coordinates.lng),
-                          territory.coordinates
-                        )
-                      ).length} alerts in this territory
-                    </p>
+                    <h3 className="font-bold text-lg">{county.name} County</h3>
                   </div>
                 </Popup>
               </Polygon>
@@ -292,8 +308,8 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
                   </Circle>
                 ))
             )}
-            {/* NASA FIRMS fire markers */}
-            {nasaFires.map((fire, idx) => (
+            {/* NASA FIRMS fire markers (filtered) */}
+            {filteredNasaFires.map((fire, idx) => (
               <Marker
                 key={idx}
                 position={[fire.geometry.coordinates[1], fire.geometry.coordinates[0]]}
@@ -312,6 +328,21 @@ const AlertMap: React.FC<AlertMapProps> = ({ alerts, onAlertClick, showHeatmap =
                 </Popup>
               </Marker>
             ))}
+            {/* Mass movement placeholder marker */}
+            <Marker
+              position={[massMovementMarker.lat, massMovementMarker.lng]}
+              icon={L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background-color: #eab308; width: 22px; height: 22px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>`
+              })}
+            >
+              <Popup>
+                <div className="p-2">
+                  <h3 className="font-bold text-lg">Mass Movement</h3>
+                  <p className="text-sm text-gray-600">{massMovementMarker.description}</p>
+                </div>
+              </Popup>
+            </Marker>
           </MapContainer>
         </div>
 
