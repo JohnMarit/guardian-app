@@ -34,14 +34,14 @@ const Admin = () => {
   const [isAddOfficerOpen, setIsAddOfficerOpen] = useState(false);
   const [isSendMessageOpen, setIsSendMessageOpen] = useState(false);
   const [newOfficer, setNewOfficer] = useState({ name: '', email: '', phone: '', zone: '' });
-  const [messageData, setMessageData] = useState({ subject: '', content: '', selectedZone: '' });
+  const [messageData, setMessageData] = useState({ subject: '', content: '', zone: '' });
 
   // Fetch officers from the backend
   const { data: officers, isLoading } = useQuery<Officer[]>({
     queryKey: ['officers'],
     queryFn: async () => {
       const response = await apiClient.get('/api/v1/users', { params: { role: 'officer' } });
-      return response.data;
+      return response.data.data;
     }
   });
 
@@ -83,7 +83,7 @@ const Admin = () => {
         description: "The message has been sent to all officers in the selected zone.",
       });
       setIsSendMessageOpen(false);
-      setMessageData({ subject: '', content: '', selectedZone: '' });
+      setMessageData({ subject: '', content: '', zone: '' });
     },
     onError: (error) => {
       toast({
@@ -101,7 +101,11 @@ const Admin = () => {
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    sendMessageMutation.mutate(messageData);
+    sendMessageMutation.mutate({
+      subject: messageData.subject,
+      content: messageData.content,
+      zone: messageData.zone,
+    });
   };
 
   return (
@@ -227,8 +231,8 @@ const Admin = () => {
                             <select
                               id="zone"
                               className="w-full rounded-md border border-input bg-background px-3 py-2"
-                              value={messageData.selectedZone}
-                              onChange={(e) => setMessageData({ ...messageData, selectedZone: e.target.value })}
+                              value={messageData.zone}
+                              onChange={(e) => setMessageData({ ...messageData, zone: e.target.value })}
                               required
                             >
                               <option value="">Select a zone</option>
