@@ -8,12 +8,8 @@ class WebSocketService {
   private eventEmitter = mitt();
 
   private getWebSocketUrl() {
-    const baseUrl = import.meta.env.VITE_API_URL || 
-      (window.location.hostname !== 'localhost'
-        ? 'https://community-guard-2525c539a22c.herokuapp.com'
-        : 'http://localhost:3001');
-    // Convert http(s) to ws(s)
-    return baseUrl.replace(/^http/, 'ws').replace(/\/api$/, '') + '/ws';
+    // Use production WebSocket endpoint directly
+    return 'wss://community-guard-2525c539a22c.herokuapp.com/ws';
   }
 
   connect() {

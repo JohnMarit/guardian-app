@@ -1,11 +1,7 @@
 import axios from 'axios';
 
 // Determine base URL for API
-const baseURL =
-  import.meta.env.VITE_API_URL ||
-  (window.location.hostname !== 'localhost'
-    ? 'https://community-guard-2525c539a22c.herokuapp.com/api'
-    : 'http://localhost:3001/api');
+const baseURL = 'https://community-guard-2525c539a22c.herokuapp.com/api';
 
 // Create axios instance with default config
 const apiClient = axios.create({
