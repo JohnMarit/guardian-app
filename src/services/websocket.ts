@@ -1,20 +1,19 @@
-import { EventEmitter } from 'events';
+import mitt from 'mitt';
 
 class WebSocketService {
   private ws: WebSocket | null = null;
-  private eventEmitter = new EventEmitter();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private eventEmitter = mitt();
 
   private getWebSocketUrl() {
     const baseUrl = import.meta.env.VITE_API_URL || 
       (window.location.hostname !== 'localhost'
         ? 'https://community-guard-2525c539a22c.herokuapp.com'
         : 'http://localhost:3001');
-    
     // Convert http(s) to ws(s)
-    return baseUrl.replace(/^http/, 'ws') + '/ws';
+    return baseUrl.replace(/^http/, 'ws').replace(/\/api$/, '') + '/ws';
   }
 
   connect() {
@@ -44,7 +43,6 @@ class WebSocketService {
       };
 
       this.ws.onclose = () => {
-        console.log('WebSocket disconnected');
         this.attemptReconnect();
       };
     } catch (error) {
@@ -55,7 +53,6 @@ class WebSocketService {
 
   private attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('Max reconnection attempts reached');
       return;
     }
 
@@ -65,9 +62,8 @@ class WebSocketService {
 
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
     console.log(`Attempting to reconnect in ${delay}ms...`);
-    
+
     this.reconnectTimeout = setTimeout(() => {
-      this.reconnectAttempts++;
       this.connect();
     }, delay);
   }
@@ -76,18 +72,18 @@ class WebSocketService {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
     }
-    
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
   }
 
-  subscribe(callback: (data: any) => void) {
-    this.eventEmitter.on('message', callback);
-    return () => {
-      this.eventEmitter.off('message', callback);
-    };
+  on(event: string, handler: (data: any) => void) {
+    this.eventEmitter.on(event, handler);
+  }
+
+  off(event: string, handler: (data: any) => void) {
+    this.eventEmitter.off(event, handler);
   }
 
   send(data: any) {
